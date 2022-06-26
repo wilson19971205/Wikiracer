@@ -1,304 +1,179 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import random
+import sys
+from typing import Callable, Iterator
+from itertools import chain
+from collections import defaultdict
+from types import ModuleType
+from importlib import reload
+from urllib.request import urlopen
+
+import pytest
 from py_wikiracer.internet import Internet
-from typing import List
+from py_wikiracer.wikiracer import Parser, BFSProblem, DFSProblem, DijkstrasProblem, WikiracerProblem
 
-class Parser:
+REQ_LIMIT = 75 # per test, normally
 
-    @staticmethod
-    def get_links_in_page(html: str) -> List[str]:
-        """
-        In this method, we should parse a page's HTML and return a list of links in the page.
-        Be sure not to return any link with a DISALLOWED character.
-        All links should be of the form "/wiki/<page name>", as to not follow external links
-        """
-        links = []
-        disallowed = Internet.DISALLOWED
 
-        # YOUR CODE HERE
-        substr = "href=\"/wiki/"
-        match_find = [link for link in range(len(html)) if html.startswith(substr, link)]
+# In[2]:
 
-        # href="/wiki/*" match this regex, append to links
-        possible_links = []
-        for link in match_find:
-            possible_links.append(html[link+6:html.find('\"',link+6)])
 
-        # remove duplicates
-        for link in possible_links:
-            if link not in links:
-                links.append(link)
+import random
+import sys
+from typing import Callable, Iterator
+from itertools import chain
+from collections import defaultdict
+from types import ModuleType
+from importlib import reload
+from urllib.request import urlopen
 
-        # filter links using disallowed chars
-        remove_links = []
-        for i in range(len(links)):
-            for char in disallowed:
-                if links[i].find(char,6) != -1:
-                    remove_links.append(links[i])
-                    break
+import pytest
+from py_wikiracer.internet import Internet
+from py_wikiracer.wikiracer import Parser, BFSProblem, DFSProblem, DijkstrasProblem, WikiracerProblem
 
-        # remove invalid links
-        for link in remove_links:
-            links.remove(link)
+REQ_LIMIT = 75 # per test, normally
 
-        # You can look into using regex, or just use Python's find methods to find the <a> tags or any other identifiable features
-        # A good starting place is to print out `html` and look for patterns before/after the links that you can string.find().
-        # Make sure your list doesn't have duplicates. Return the list in the same order as they appear in the HTML.
-        # This function will be stress tested so make it efficient!
+def test_parser():
+    internet = Internet()
+    html = internet.get_page("/wiki/Henry_Krumrey")
+    assert Parser.get_links_in_page(html) == ['/wiki/Wisconsin_State_Senate', '/wiki/Wisconsin_Senate,_District_20', '/wiki/Wisconsin_State_Assembly', '/wiki/Plymouth,_Sheboygan_County,_Wisconsin', '/wiki/Republican_Party_(United_States)', '/wiki/Sheboygan_County,_Wisconsin', '/wiki/United_States_presidential_election_in_Wisconsin,_1900', '/wiki/Crystal_Lake,_Illinois', '/wiki/Henry_Krumrey', '/wiki/Main_Page']
 
-        return links
+def test_trivial():
+    """
+    All pages contain a link to themselves, which any search algorithm should recognize.
+    """
+    bfs = BFSProblem()
+    dfs = DFSProblem()
+    dij = DijkstrasProblem()
 
-# In these methods, we are given a source page and a goal page, and we should return
-#  the shortest path between the two pages. Be careful! Wikipedia is very large.
+    assert bfs.bfs(source = "/wiki/ASDF", goal = "/wiki/ASDF") == ["/wiki/ASDF", "/wiki/ASDF"]
+    assert dfs.dfs(source = "/wiki/ASDF", goal = "/wiki/ASDF") == ["/wiki/ASDF", "/wiki/ASDF"]
+    assert dij.dijkstras(source = "/wiki/ASDF", goal = "/wiki/ASDF") == ["/wiki/ASDF", "/wiki/ASDF"]
 
-# These are all very similar algorithms, so it is advisable to make a global helper function that does all of the work, and have
-#  each of these call the helper with a different data type (stack, queue, priority queue, etc.)
+    assert bfs.internet.requests == ["/wiki/ASDF"]
+    assert dfs.internet.requests == ["/wiki/ASDF"]
+    assert dij.internet.requests == ["/wiki/ASDF"]
 
-class BFSProblem:
+def test_trivial_2():
+    """
+    Searches going to page 1 distance away.
+    """
+    bfs = BFSProblem()
+    dfs = DFSProblem()
+    dij = DijkstrasProblem()
+
+    assert bfs.bfs(source = "/wiki/Reese_Witherspoon", goal = "/wiki/Academy_Awards") == ["/wiki/Reese_Witherspoon", "/wiki/Academy_Awards"]
+    assert dfs.dfs(source = "/wiki/Reese_Witherspoon", goal = "/wiki/Academy_Awards") == ["/wiki/Reese_Witherspoon", "/wiki/Academy_Awards"]
+    assert dij.dijkstras(source = "/wiki/Reese_Witherspoon", goal = "/wiki/Academy_Awards") == ["/wiki/Reese_Witherspoon", "/wiki/Academy_Awards"]
+
+    assert bfs.internet.requests == ["/wiki/Reese_Witherspoon"]
+    assert dfs.internet.requests == ["/wiki/Reese_Witherspoon"]
+    assert dij.internet.requests == ["/wiki/Reese_Witherspoon"]
+
+def test_bfs_basic():
+    """
+    BFS depth 2 search
+    """
+    bfs = BFSProblem()
+    assert bfs.bfs(source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia") == ['/wiki/Calvin_Li', '/wiki/Chinese_language', '/wiki/Wikipedia']
+    assert bfs.internet.requests == ['/wiki/Calvin_Li', '/wiki/Chinese_name', '/wiki/Chinese_surname', '/wiki/Li_(surname_%E6%9D%8E)', '/wiki/Wuhan', '/wiki/Hubei', '/wiki/Central_Academy_of_Drama', '/wiki/All_Men_Are_Brothers_(TV_series)', '/wiki/Chinese_language']
+
+def test_dfs_basic():
+    """
+    DFS depth 2 search
+    """
+    dfs = DFSProblem()
+    assert dfs.dfs(source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia") == ['/wiki/Calvin_Li', '/wiki/Main_Page', '/wiki/Wikipedia']
+    assert dfs.internet.requests == ['/wiki/Calvin_Li', '/wiki/Main_Page']
+
+def test_dijkstras_basic():
+    """
+    DFS depth 2 search
+    """
+    dij = DijkstrasProblem()
+    # This costFn is to make sure there are never any ties coming out of the heap, since the default costFn produces ties and we don't define a tiebreaking mechanism for priorities
+    assert dij.dijkstras(source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia", costFn = lambda y, x: len(x) * 1000 + x.count("a") * 100  + x.count("u") + x.count("h") * 5 - x.count("F")) == ['/wiki/Calvin_Li', '/wiki/Main_Page', '/wiki/Wikipedia']
+    assert dij.internet.requests == ['/wiki/Calvin_Li', '/wiki/Hubei', '/wiki/Wuxia', '/wiki/Wuhan', '/wiki/Pinyin', '/wiki/Firefox', '/wiki/Tencent', '/wiki/Wu_Yong', '/wiki/Cao_Cao', '/wiki/John_Woo', '/wiki/Kelly_Lin', '/wiki/Sina_Corp', '/wiki/Huo_Siyan', '/wiki/Shawn_Yue', '/wiki/Main_Page']
+
+
+class CustomInternet():
     def __init__(self):
-        self.internet = Internet()
-    # Example in/outputs:
-    #  bfs(source = "/wiki/Computer_science", goal = "/wiki/Computer_science") == ["/wiki/Computer_science", "/wiki/Computer_science"]
-    #  bfs(source = "/wiki/Computer_science", goal = "/wiki/Computation") == ["/wiki/Computer_science", "/wiki/Computation"]
-    # Find more in the test case file.
+        self.requests = []
+    def get_page(self, page):
+        self.requests.append(page)
+        return f'<a href="{page}"></a>'
 
-    # Do not try to make fancy optimizations here. The autograder depends on you following standard BFS and will check all of the pages you download.
-    # Links should be inserted into the queue as they are located in the page, and should be obtained using Parser's get_links_in_page.
-    # Be very careful not to add things to the "visited" set of pages too early. You must wait for them to come out of the queue first. See if you can figure out why.
-    #  This applies for bfs, dfs, and dijkstra's.
-    # Download a page with self.internet.get_page().
-    def bfs(self, source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia"):
-        path = [source]
+def test_none_on_fail():
+    """
+    Program should return None on failure
+    """
+    bfs = BFSProblem()
+    dfs = DFSProblem()
+    dij = DijkstrasProblem()
 
-        # YOUR CODE HERE
-        # ...
-        path_exist = False
-        queue = []
-        seen = []
-        queue.append(path)
+    # Testing hack: override the internet to inject our own HTML
+    bfs.internet = CustomInternet()
+    dfs.internet = CustomInternet()
+    dij.internet = CustomInternet()
 
-        while queue:
-            path = queue.pop(0)
-            path_end = path[-1]
-            
-            if path_end not in self.internet.requests:
-                html = self.internet.get_page(path_end)
-                links = Parser().get_links_in_page(html)
+    assert bfs.bfs(source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia") == None
+    assert dfs.dfs(source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia") == None
+    assert dij.dijkstras(source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia") == None
 
-                if goal in links:
-                    path_exist = True
-                    path.append(goal)
-                    return path
+    assert bfs.internet.requests == ["/wiki/Calvin_Li"]
+    assert dfs.internet.requests == ["/wiki/Calvin_Li"]
+    assert dij.internet.requests == ["/wiki/Calvin_Li"]
 
-                for link in links:
-                    if link not in seen:
-                        new_path = list(path)
-                        new_path.append(link)
-                        queue.append(new_path)
-                        seen.append(link)
+def test_dfs_complex():
+    """
+    A complex DFS example to test your searching algorithm.
+    """
+    dfs = DFSProblem()
+    assert dfs.dfs(source = "/wiki/Calvin_Li", goal = "/wiki/Quebecor") == ['/wiki/Calvin_Li', '/wiki/Main_Page', '/wiki/Wikimedia_Foundation', '/wiki/VIAF_(identifier)', '/wiki/Virtual_International_Authority_File', '/wiki/Interested_Parties_Information', '/wiki/Law', '/wiki/Human_science', '/wiki/Truth', '/wiki/Verstehen', '/wiki/Phronesis', '/wiki/Knowledge', '/wiki/Max_Weber', '/wiki/Trove_(identifier)', '/wiki/Trove', '/wiki/The_Sydney_Morning_Herald', '/wiki/OzTAM', '/wiki/Canwest', '/wiki/Pembroke_Daily_Observer', '/wiki/Postmedia_News', '/wiki/Postmedia_Network', '/wiki/Dose_(magazine)', '/wiki/Northern_News', '/wiki/Jam!', '/wiki/Quebecor']
+    assert dfs.internet.requests == ['/wiki/Calvin_Li', '/wiki/Main_Page', '/wiki/Wikimedia_Foundation', '/wiki/VIAF_(identifier)', '/wiki/Virtual_International_Authority_File', '/wiki/Interested_Parties_Information', '/wiki/Law', '/wiki/Human_science', '/wiki/Truth', '/wiki/Verstehen', '/wiki/Phronesis', '/wiki/Knowledge', '/wiki/Max_Weber', '/wiki/Trove_(identifier)', '/wiki/Trove', '/wiki/The_Sydney_Morning_Herald', '/wiki/OzTAM', '/wiki/Canwest', '/wiki/Pembroke_Daily_Observer', '/wiki/Postmedia_News', '/wiki/Postmedia_Network', '/wiki/Dose_(magazine)', '/wiki/Northern_News', '/wiki/Jam!']
 
-        if path_exist == False:
-            return None # if no path exists, return None
 
-class DFSProblem:
-    def __init__(self):
-        self.internet = Internet()
-    # Links should be inserted into a stack as they are located in the page. Do not add things to the visited list until they are taken out of the stack.
-    def dfs(self, source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia"):
-        path = [source]
+def test_wikiracer_1():
+    """
+    Tests wikiracer speed on one input.
+    A great implementation can do this in less than 8 internet requests.
+    A good implementation can do this in less than 15 internet requests.
+    A mediocre implementation can do this in less than 30 internet requests.
+    
+    To make your own test cases like this, I recommend finding a starting page,
+    clicking on a few links, and then seeing if your program can get from your
+    start to your end in only a few downloads.
+    """
+    limit = 15
 
-        # YOUR CODE HERE
-        # ...
-        path_exist = False
-        queue = []
-        seen = []
-        queue.append(path)
+    racer = WikiracerProblem()
+    racer.wikiracer(source="/wiki/Computer_science", goal="/wiki/Richard_Soley")
+    assert len(racer.internet.requests) <= limit
 
-        while queue:
-            path = queue.pop()
-            path_end = path[-1]
 
-            if path_end not in seen:
-                seen.append(path_end)
-                html = self.internet.get_page(path_end)
-                links = Parser().get_links_in_page(html)
 
-                if goal in links:
-                    path_exist = True
-                    path.append(goal)
-                    return path
+def test_wikiracer_2():
+    """
+    Tests wikiracer speed on one input.
+    A great implementation can do this in less than 25 internet requests.
+    A good implementation can do this in less than 80 internet requests.
+    A mediocre implementation can do this in less than 300 internet requests.
+    """
+    limit = 80
 
-                for link in links:
-                    new_path = list(path)
-                    new_path.append(link)
-                    queue.append(new_path)
+    racer = WikiracerProblem()
+    racer.wikiracer(source="/wiki/Waakirchen", goal="/wiki/A")
+    assert len(racer.internet.requests) <= limit
 
-        if path_exist == False:
-            return None # if no path exists, return None
 
-class DijkstrasProblem:
-    def __init__(self):
-        self.internet = Internet()
-    # Links should be inserted into the heap as they are located in the page.
-    # By default, the cost of going to a link is the length of a particular destination link's name. For instance,
-    #  if we consider /wiki/a -> /wiki/ab, then the default cost function will have a value of 8.
-    # This cost function is overridable and your implementation will be tested on different cost functions. Use costFn(node1, node2)
-    #  to get the cost of a particular edge.
-    # You should return the path from source to goal that minimizes the total cost. Assume cost > 0 for all edges.
-    def dijkstras(self, source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia", costFn = lambda x, y: len(y)):
-        path = [source]
+# In[3]:
 
-        # YOUR CODE HERE
-        # ...
-        path_exist = False
-        queue = []
-        seen = {}
-        seen[source] = 0
-        queue.append((0, path))
 
-        while queue:
-            pair = queue.pop(0)
-            dist = pair[0]
-            path = pair[1]
-            path_end = path[-1]
+test_wikiracer_1()
+test_wikiracer_2()
 
-            html = self.internet.get_page(path_end)
-            links = Parser().get_links_in_page(html)
-            
-            if (goal in links) and (dist <= seen[path_end]):
-                path_exist = True
-                path.append(goal)
-                return path
-
-            for link in links:
-                distance = costFn(path_end, link) + dist
-                if (link not in seen) or (seen.get(link) > distance):
-                    new_path = list(path)
-                    new_path.append(link)
-                    queue.append((distance, new_path))
-                    seen[link] = distance
-            queue.sort()
-
-        if path_exist == False:
-            return None # if no path exists, return None
-
-class WikiracerProblem:
-    def __init__(self):
-        self.internet = Internet()
-
-    # Time for you to have fun! Using what you know, try to efficiently find the shortest path between two wikipedia pages.
-    # Your only goal here is to minimize the total amount of pages downloaded from the Internet, as that is the dominating time-consuming action.
-
-    # Your answer doesn't have to be perfect by any means, but we want to see some creative ideas.
-    # One possible starting place is to get the links in `goal`, and then search for any of those from the source page, hoping that those pages lead back to goal.
-
-    # Note: a BFS implementation with no optimizations will not get credit, and it will suck.
-    # You may find Internet.get_random() useful, or you may not.
-    def self_define_parser(self, links):
-        disallowed = ["(", ")"]
-
-        # filter links using disallowed chars
-        remove_links = []
-        for i in range(len(links)):
-            for char in disallowed:
-                if links[i].find(char,6) != -1:
-                    remove_links.append(links[i])
-                    break
-
-        # remove invalid links
-        for link in remove_links:
-            links.remove(link)
-
-        return links
-
-    def wikiracer(self, source = "/wiki/Calvin_Li", goal = "/wiki/Wikipedia"):
-
-        source_path = [source]
-        goal_path = [goal]
-        possible_goal_path = [[goal]]
-
-        # YOUR CODE HERE
-        # ----- Double head BFS -----
-        s_links = []
-        g_links = []
-        queue = []
-        seen = []
-        layer = 1
-        path_exist = False
-
-        queue.append(source_path)
-
-        while queue:
-            source_path = queue.pop(0)
-            source_path_end = source_path[-1]
-            goal_path_start = goal_path[0]
-            
-            if source_path_end not in self.internet.requests:
-                s_html = self.internet.get_page(source_path_end)
-                s_links = Parser().get_links_in_page(s_html)
-                s_links = self.self_define_parser(s_links)
-
-                # if goal is source, if find goal directly or find goal_path_start
-                for path in possible_goal_path:
-                    if path[0] in s_links:
-                        source_path.extend(path)
-                        return source_path
-
-                if goal_path_start not in self.internet.requests:
-                    g_html = self.internet.get_page(goal_path_start)
-                    g_links = Parser().get_links_in_page(g_html)
-                    g_links = self.self_define_parser(g_links)
-
-                gather = list(set(s_links)&set(g_links))
-
-                # find the connect path with 
-                if len(gather) > 0:
-                    for link in gather:
-                        html = self.internet.get_page(link)
-                        links = Parser().get_links_in_page(html)
-                        if goal_path_start in links:
-                            source_path.append(link)
-                            source_path.extend(goal_path)
-                            return source_path
-
-                    for link in gather:
-                        g_links.remove(link)
-
-                    if len(queue) > 0:
-                        if len(queue[0]) == layer + 1:
-                            layer += 1
-                            for link in g_links:
-                                html = self.internet.get_page(link)
-                                links = Parser().get_links_in_page(html)
-                                if goal_path_start in links:
-                                    goal_path.insert(0, link)
-                                    new_path = list(goal_path)
-                                    possible_goal_path.append(new_path)
-                                    break
-
-                for link in s_links:
-                    if link not in seen:
-                        new_path = list(source_path)
-                        new_path.append(link)
-                        queue.append(new_path)
-                        seen.append(link)
-
-        if path_exist == False:
-            return None # if no path exists, return None
-
-# KARMA
-class FindInPageProblem:
-    def __init__(self):
-        self.internet = Internet()
-    # This Karma problem is a little different. In this, we give you a source page, and then ask you to make up some heuristics that will allow you to efficiently
-    #  find a page containing all of the words in `query`. Again, optimize for the fewest number of internet downloads, not for the shortest path.
-
-    def find_in_page(self, source = "/wiki/Calvin_Li", query = ["ham", "cheese"]):
-
-        raise NotImplementedError("Karma method find_in_page")
-
-        path = [source]
-
-        # find a path to a page that contains ALL of the words in query in any place within the page
-        # path[-1] should be the page that fulfills the query.
-        # YOUR CODE HERE
-
-        return path # if no path exists, return None
