@@ -3,7 +3,7 @@ Parser, BFS, DFS, Dijkstra's Algorithm, Double head BFS
 
 ## How to run:
 ```
-python3 Wikiracer.py
+python3 wikiracer.py
 ```
 
 ## Introduction:
