@@ -7,13 +7,13 @@ python3 wikiracer.py
 ```
 
 ## Introduction:
-The goal is get from one specified Wikipedia page (the start node) to another (the goal node) as fast as possible (or perhaps in as few clicks as possible).
+The goal is to get from one specified Wikipedia page (the start node) to another (the goal node) as fast as possible (or perhaps in as few clicks as possible).
 
 ### Parser
 Once we’ve downloaded the HTML markup for a Wikipedia page, we need to read the HTML code and find all of the page’s neighbors (links to other Wikipedia pages).
 
 ### Breadth First Search (BFS)
-BFS is a traversing algorithm where you should start traversing from a selected node (source or starting node) and traverse the graph layerwise thus exploring the neighbour nodes (nodes which are directly connected to source node). You must then move towards the next-level neighbour nodes.
+BFS is a traversing algorithm where you should start traversing from a selected node (source or starting node) and traverse the graph layerwise thus exploring the neighbor nodes (nodes that are directly connected to the source node). You must then move toward the next-level neighbor nodes.
 
 ![image](https://user-images.githubusercontent.com/43212302/175808368-58ee2f08-5010-4e84-b4b5-d28544927bb9.png)
 
@@ -34,6 +34,6 @@ Dijkstra's Algorithm finds the shortest path between a given node (which is call
 Screenshot from: https://python.plainenglish.io/dijkstras-algorithm-theory-and-python-implementation-c1135402c321
 
 ## Output:
-The number shows that how many webs did the program search, and also shows the path.
+The number shows how many webs did the program search, and also shows the path.
 
 ![image](https://user-images.githubusercontent.com/43212302/175808243-4b70d6bd-3292-4698-9d82-85670bdf1a34.png)
